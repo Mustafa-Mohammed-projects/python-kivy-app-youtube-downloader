@@ -9,6 +9,8 @@ version = 1.0
 
 # المتطلبات البرمجية الأساسية لعمل التطبيق والتحميل بأمان داخل أندرويد
 requirements = python3,kivy==2.3.0,pyjnius,certifi,yt-dlp
+icon.filename = %(source.dir)s/icon.png
+presplash.filename = %(source.dir)s/presplash.png
 
 orientation = portrait
 fullscreen = 0
