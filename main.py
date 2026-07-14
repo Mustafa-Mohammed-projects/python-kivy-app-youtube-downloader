@@ -31,7 +31,7 @@ from kivy.uix.popup import Popup
 from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.clock import Clock
 from kivy.core.window import Window
-from kivy.graphics import Color, RoundedRectangle, Line
+from kivy.graphics import Color, RoundedRectangle
 from kivy.utils import platform
 from kivy.metrics import dp, sp
 
@@ -39,8 +39,8 @@ if platform != 'android':
     Window.size = (410, 730)
 Window.clearcolor = (0.06, 0.06, 0.08, 1)
 
-PRIMARY_COLOR = (0.95, 0.33, 0.33, 1)    
-SECONDARY_COLOR = (0.12, 0.12, 0.16, 1)  
+PRIMARY_COLOR = (0.95, 0.33, 0.33, 1)
+SECONDARY_COLOR = (0.12, 0.12, 0.16, 1)
 BG_DARK = (0.06, 0.06, 0.08, 1)
 TEXT_WHITE = (1, 1, 1, 1)
 TEXT_MUTED = (0.55, 0.55, 0.6, 1)
@@ -53,31 +53,31 @@ except ImportError:
 
 def get_ffmpeg_location():
     if platform != 'android':
-        return None  
-        
+        return None
+
     app = App.get_running_app()
     if not app:
         return None
-        
-    internal_dir = app.user_data_dir  
+
+    internal_dir = app.user_data_dir
     target_ffmpeg = os.path.join(internal_dir, 'ffmpeg')
     src_ffmpeg = os.path.join(os.path.dirname(__file__), 'ffmpeg.bin')
-    
+
     if os.path.exists(src_ffmpeg):
         if not os.path.exists(target_ffmpeg) or os.path.getsize(src_ffmpeg) != os.path.getsize(target_ffmpeg):
             try:
                 shutil.copy(src_ffmpeg, target_ffmpeg)
-                os.chmod(target_ffmpeg, 0o755)  
+                os.chmod(target_ffmpeg, 0o755)
             except Exception as e:
                 print(f"Error extracting ffmpeg binary: {e}")
-                
+
     if os.path.exists(target_ffmpeg):
-        return internal_dir  
+        return internal_dir
     return None
 
 class FluentCard(BoxLayout):
     def __init__(self, bg_color=SECONDARY_COLOR, radius=[dp(14)], **kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         self.bg_color = bg_color
         self.radius = radius
         with self.canvas.before:
@@ -92,13 +92,13 @@ class FluentCard(BoxLayout):
 
 class RoundedButton(Button):
     def __init__(self, bg_color=PRIMARY_COLOR, radius=[dp(12)], **kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         self.background_normal = ''
         self.background_down = ''
         self.background_color = (0, 0, 0, 0)
         self.bg_color = bg_color
         self.radius = radius
-        
+
         with self.canvas.before:
             self.color_instruction = Color(*self.bg_color)
             self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
@@ -115,42 +115,22 @@ class RoundedButton(Button):
             self.color_instruction.rgba = self.bg_color
 
 
-# حقل إدخال الرابط المعدل بحواف دائرية متناسقة تماماً مع باقي كروت التطبيق
 class RoundedTextInput(TextInput):
-    def __init__(self, radius=[dp(14)], **kwargs):
+    def __init__(self, **kwargs):
         kwargs['background_normal'] = ''
         kwargs['background_active'] = ''
-        super().__init__(kwargs)
-        self.radius = radius
-        self.background_color = (0, 0, 0, 0) # جعل الخلفية الأصلية شفافة للرسم اليدوي
-        self.foreground_color = (1, 1, 1, 1)             
-        self.hint_text_color = (0.55, 0.55, 0.6, 1)       
-        self.cursor_color = (0.95, 0.33, 0.33, 1)         
+        super().__init__(**kwargs)
+
+        self.background_color = (0.14, 0.14, 0.18, 1)
+        self.foreground_color = (1, 1, 1, 1)
+        self.hint_text_color = (0.55, 0.55, 0.6, 1)
+        self.cursor_color = (0.95, 0.33, 0.33, 1)
         self.padding = [dp(14), dp(12), dp(14), dp(12)]
-
-        with self.canvas.before:
-            self.bg_color_inst = Color(0.14, 0.14, 0.18, 1)
-            self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
-            self.border_color_inst = Color(0.20, 0.20, 0.25, 1)
-            self.border_line = Line(rounded_rectangle=(self.x, self.y, self.width, self.height, self.radius[0]), width=dp(1))
-            
-        self.bind(pos=self._update_canvas, size=self._update_canvas)
-
-    def _update_canvas(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
-        self.border_line.rounded_rectangle = (self.x, self.y, self.width, self.height, self.radius[0])
-
-    def on_focus(self, instance, value):
-        if value:
-            self.border_color_inst.rgba = PRIMARY_COLOR  # إضاءة الحواف عند الكتابة
-        else:
-            self.border_color_inst.rgba = (0.20, 0.20, 0.25, 1)
 
 
 class CustomSpinnerOption(SpinnerOption):
     def __init__(self, **kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         self.background_normal = ''
         self.background_color = (0.15, 0.15, 0.20, 1)
         self.color = (1, 1, 1, 1)
@@ -159,14 +139,14 @@ class CustomSpinnerOption(SpinnerOption):
 
 class RoundedSpinner(Spinner):
     def __init__(self, bg_color=(0.18, 0.18, 0.24, 1), radius=[dp(10)], **kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         self.background_normal = ''
         self.background_down = ''
         self.background_color = (0, 0, 0, 0)
         self.option_cls = CustomSpinnerOption
         self.bg_color = bg_color
         self.radius = radius
-        
+
         with self.canvas.before:
             self.color_instruction = Color(*self.bg_color)
             self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=self.radius)
@@ -178,7 +158,7 @@ class RoundedSpinner(Spinner):
 
 
 class DownloadJob:
-    def __init__(self, url, title, thumbnail, duration, uploader, formats, selected_format_id, format_type='video', is_video_only=False):
+    def __init__(self, url, title, thumbnail, duration, uploader, formats, selected_format_id, format_type='video'):
         self.id = uuid.uuid4().hex[:10]
         self.url = url
         self.title = title
@@ -188,7 +168,6 @@ class DownloadJob:
         self.formats = formats
         self.selected_format_id = selected_format_id
         self.format_type = format_type
-        self.is_video_only = is_video_only  
         self.status = 'ready'
         self.progress = 0.0
         self.error = None
@@ -233,26 +212,30 @@ class DownloadManager:
         job = self.get_job(job_id)
         if not job or job.status in ('downloading', 'done'):
             return False
-        
+
         job.status = 'downloading'
         job.progress = 0.0
         job.is_cancelled = False
-        
-        # تحويل المسار تلقائياً لمجلد التنزيلات العام للأندرويد (Download) بشكل متوافق تماماً
+
         if platform == 'android':
             try:
                 from jnius import autoclass
-                Environment = autoclass('android.os.Environment')
-                download_dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getAbsolutePath()
-            except Exception as e:
-                download_dir = "/storage/emulated/0/Download"
+                PythonActivity = autoclass('org.kivy.android.PythonActivity')
+                activity = PythonActivity.mActivity
+                ext_dir = activity.getExternalFilesDir(None)
+                if ext_dir:
+                    download_dir = os.path.join(ext_dir.getAbsolutePath(), "DownKaze")
+                else:
+                    download_dir = os.path.join(activity.getFilesDir().getAbsolutePath(), "DownKaze")
+            except:
+                download_dir = "."
         else:
             download_dir = os.path.join(os.path.expanduser("~"), "Downloads")
-            
+
         if not os.path.exists(download_dir):
-            try: 
+            try:
                 os.makedirs(download_dir)
-            except: 
+            except:
                 download_dir = "."
 
         opts = {
@@ -275,11 +258,8 @@ class DownloadManager:
                 'preferredquality': '192',
             }]
         else:
-            if job.is_video_only:
-                opts['format'] = f"{job.selected_format_id}+bestaudio/best"
-                opts['merge_output_format'] = 'mp4'  
-            else:
-                opts['format'] = job.selected_format_id
+            # الصيغ المعروضة كلها صيغ مدمجة (صوت+صورة) أصلاً، لذلك لا حاجة لأي دمج بعد التحميل
+            opts['format'] = job.selected_format_id
 
         def progress_hook(d):
             if job.is_cancelled:
@@ -329,7 +309,7 @@ class DownloadManager:
 
 class MainScreen(Screen):
     def __init__(self, **kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         self.format_type = 'video'
         self.current_jobs_data = []
         self.build_ui()
@@ -356,13 +336,13 @@ class MainScreen(Screen):
             color=TEXT_WHITE, font_size=sp(13), bold=True
         )
         self.video_toggle.bind(on_press=lambda x: self.switch_mode('video'))
-        
+
         self.audio_toggle = RoundedButton(
             text='Audio MP3', bg_color=(0.11, 0.11, 0.14, 1),
             color=TEXT_MUTED, font_size=sp(13), bold=True
         )
         self.audio_toggle.bind(on_press=lambda x: self.switch_mode('audio'))
-        
+
         selector_layout.add_widget(self.video_toggle)
         selector_layout.add_widget(self.audio_toggle)
         root.add_widget(selector_layout)
@@ -403,7 +383,7 @@ class MainScreen(Screen):
             self.audio_toggle.color = TEXT_WHITE
             self.video_toggle.bg_color = (0.11, 0.11, 0.14, 1)
             self.video_toggle.color = TEXT_MUTED
-            
+
         self.video_toggle.canvas.before.children[0].rgba = self.video_toggle.bg_color
         self.audio_toggle.canvas.before.children[0].rgba = self.audio_toggle.bg_color
 
@@ -424,14 +404,14 @@ class MainScreen(Screen):
             loading_card = FluentCard(orientation='vertical', size_hint_y=None, height=dp(80), padding=dp(16))
             loading_card.add_widget(Label(text="Extracting metadata & qualities...", color=TEXT_MUTED, font_size=sp(13)))
             self.cards_container.add_widget(loading_card)
-            
+
             self.current_jobs_data.append({'url': url, 'card': loading_card, 'metadata': None})
             threading.Thread(target=self._async_extract, args=(url, index)).start()
 
     def _async_extract(self, url, index):
         try:
             ydl_opts = {
-                'nocheckcertificate': True, 
+                'nocheckcertificate': True,
                 'quiet': True,
                 'cachedir': False,
                 'no_warnings': True,
@@ -439,24 +419,22 @@ class MainScreen(Screen):
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 meta = ydl.extract_info(url, download=False)
-            
+
+            # الاحتفاظ فقط بالصيغ المدمجة (Progressive) التي تحتوي على صوت وصورة معاً
+            # هذا يلغي الحاجة لأي عملية دمج لاحقة عبر ffmpeg، ويمنع فشل التحميل
             unique_formats = {}
             for f in meta.get('formats', []):
                 h = f.get('height')
-                if h and f.get('vcodec') != 'none':
-                    acodec = f.get('acodec')
-                    is_video_only = (acodec == 'none' or acodec is None)
+                vcodec = f.get('vcodec')
+                acodec = f.get('acodec')
+                has_video = bool(vcodec) and vcodec != 'none'
+                has_audio = bool(acodec) and acodec != 'none'
+                if h and has_video and has_audio:
                     label = f"{h}p"
-                    
                     if h not in unique_formats:
                         unique_formats[h] = {
-                            'id': f['format_id'], 'label': label, 'height': h, 'is_video_only': is_video_only
+                            'id': f['format_id'], 'label': label, 'height': h
                         }
-                    else:
-                        if is_video_only and not unique_formats[h]['is_video_only']:
-                            unique_formats[h] = {
-                                'id': f['format_id'], 'label': label, 'height': h, 'is_video_only': is_video_only
-                            }
 
             formats = list(unique_formats.values())
             formats.sort(key=lambda x: x['height'], reverse=True)
@@ -468,7 +446,6 @@ class MainScreen(Screen):
                 'uploader': meta.get('uploader', 'Unknown Creator'),
                 'formats': formats,
                 'selected_format_id': formats[0]['id'] if formats else None,
-                'is_video_only': formats[0]['is_video_only'] if formats else False,
                 'url': url
             }
             Clock.schedule_once(lambda dt: self._build_media_card(index, data), 0)
@@ -477,26 +454,26 @@ class MainScreen(Screen):
 
     def _build_media_card(self, index, data):
         if index >= len(self.current_jobs_data): return
-        
+
         card = FluentCard(orientation='vertical', size_hint_y=None, height=dp(155), padding=dp(12), spacing=dp(8))
-        
+
         top_row = BoxLayout(orientation='horizontal', spacing=dp(12), size_hint_y=None, height=dp(60))
         thumb = AsyncImage(source=data['thumbnail'], size_hint_x=0.3, allow_stretch=True, keep_ratio=False)
         top_row.add_widget(thumb)
-        
+
         text_info = BoxLayout(orientation='vertical', spacing=dp(2))
         title_lbl = Label(text=data['title'][:40] + '...', font_size=sp(13), bold=True, halign='left', size_hint_y=None, height=dp(18))
         title_lbl.bind(size=title_lbl.setter('text_size'))
         author_lbl = Label(text=f"{data['uploader']} • {int(data['duration']//60)}m", font_size=sp(11), color=TEXT_MUTED, halign='left')
         author_lbl.bind(size=author_lbl.setter('text_size'))
-        
+
         text_info.add_widget(title_lbl)
         text_info.add_widget(author_lbl)
         top_row.add_widget(text_info)
         card.add_widget(top_row)
 
         actions = BoxLayout(orientation='horizontal', spacing=dp(10), size_hint_y=None, height=dp(38))
-        
+
         if self.format_type == 'video' and data['formats']:
             quality_labels = [f['label'] for f in data['formats']]
             quality_spinner = RoundedSpinner(
@@ -505,6 +482,9 @@ class MainScreen(Screen):
             )
             card.quality_spinner = quality_spinner
             actions.add_widget(quality_spinner)
+        elif self.format_type == 'video' and not data['formats']:
+            actions.add_widget(Label(text="No combined quality found", color=TEXT_MUTED, font_size=sp(11), size_hint_x=0.45))
+            card.quality_spinner = None
         else:
             actions.add_widget(Label(text="Format: MP3 Audio", color=TEXT_WHITE, font_size=sp(12), size_hint_x=0.45))
             card.quality_spinner = None
@@ -528,7 +508,7 @@ class MainScreen(Screen):
         if index >= len(self.current_jobs_data): return
         card = FluentCard(bg_color=(0.25, 0.08, 0.08, 1), size_hint_y=None, height=dp(75), padding=dp(12))
         card.add_widget(Label(text=f"Error: {error_msg[:60]}...", color=TEXT_WHITE, font_size=sp(12), halign='center'))
-        
+
         old_card = self.current_jobs_data[index]['card']
         if old_card in self.cards_container.children:
             pos_idx = self.cards_container.children.index(old_card)
@@ -536,30 +516,34 @@ class MainScreen(Screen):
             self.cards_container.add_widget(card, index=pos_idx)
         else:
             self.cards_container.add_widget(card)
-            
+
         self.current_jobs_data[index]['card'] = card
 
     def trigger_download(self, data, card):
+        if self.format_type == 'video' and not data.get('selected_format_id'):
+            self.show_popup("Error", "No combined audio+video quality is available for this link.")
+            return
+
         selected_format_id = data['selected_format_id']
-        is_video_only = data['is_video_only']
-        
+
         if hasattr(card, 'quality_spinner') and card.quality_spinner:
             chosen_label = card.quality_spinner.text
             for f in data['formats']:
                 if f['label'] == chosen_label:
                     selected_format_id = f['id']
-                    is_video_only = f.get('is_video_only', False)
                     break
 
         dm = DownloadManager()
         job = DownloadJob(
             url=data['url'], title=data['title'], thumbnail=data['thumbnail'],
             duration=data['duration'], uploader=data['uploader'], formats=data['formats'],
-            selected_format_id=selected_format_id, format_type=self.format_type,
-            is_video_only=is_video_only
+            selected_format_id=selected_format_id, format_type=self.format_type
         )
         dm.add_job(job)
-        dm.start_download(job.id)
+        started = dm.start_download(job.id)
+        if not started:
+            self.show_popup("Error", "Could not start the download. Please try again.")
+            return
         self.manager.current = 'downloads'
 
     def show_popup(self, title, msg):
@@ -569,7 +553,7 @@ class MainScreen(Screen):
 
 class DownloadsScreen(Screen):
     def __init__(self, **kwargs):
-        super().__init__(kwargs)
+        super().__init__(**kwargs)
         self.build_ui()
         Clock.schedule_interval(self.refresh_queue_view, 0.8)
 
@@ -593,23 +577,23 @@ class DownloadsScreen(Screen):
         self.add_widget(layout)
 
     def refresh_queue_view(self, dt):
-        if not self.manager or self.manager.current != 'downloads': 
+        if not self.manager or self.manager.current != 'downloads':
             return
-        
+
         self.queue_list.clear_widgets()
         jobs = DownloadManager().jobs
-        
+
         if not jobs:
             self.queue_list.add_widget(Label(text="Your download queue is empty.", color=TEXT_MUTED, font_size=sp(13), size_hint_y=None, height=dp(100)))
             return
 
         for job in jobs:
             card = FluentCard(orientation='vertical', size_hint_y=None, height=dp(105), padding=dp(12), spacing=dp(6))
-            
+
             meta_box = BoxLayout(orientation='horizontal')
             meta_box.add_widget(Label(text=job.title[:28] + "...", font_size=sp(13), bold=True, halign='left', size_hint_x=0.7))
             meta_box.children[0].bind(size=meta_box.children[0].setter('text_size'))
-            
+
             status_text = f"{int(job.progress)}% • {job.speed}" if job.status == 'downloading' else job.status.upper()
             meta_box.add_widget(Label(text=status_text, font_size=sp(11), color=PRIMARY_COLOR, halign='right', size_hint_x=0.3))
             card.add_widget(meta_box)
@@ -628,11 +612,11 @@ class DownloadsScreen(Screen):
             elif job.status == 'error':
                 err_lbl = Label(text="Download failed", color=(0.9, 0.3, 0.3, 1), font_size=sp(11))
                 ctrls.add_widget(err_lbl)
-                
+
             remove_btn = RoundedButton(text='Remove Log', bg_color=(0.22, 0.22, 0.26, 1), font_size=sp(11), size_hint_x=0.4)
             remove_btn.bind(on_press=lambda x, j_id=job.id: DownloadManager().remove_job(j_id))
             ctrls.add_widget(remove_btn)
-            
+
             card.add_widget(ctrls)
             self.queue_list.add_widget(card)
 
