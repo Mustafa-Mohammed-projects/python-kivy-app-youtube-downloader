@@ -45,13 +45,18 @@ BG_DARK = (0.06, 0.06, 0.08, 1)
 TEXT_WHITE = (1, 1, 1, 1)
 TEXT_MUTED = (0.55, 0.55, 0.6, 1)
 SUCCESS_GREEN = (0.15, 0.68, 0.37, 1)
+INPUT_BG = (0.14, 0.14, 0.18, 1)
 
 try:
     import yt_dlp
 except ImportError:
     yt_dlp = None
 
+
 def get_ffmpeg_location():
+    """Extracts the bundled ffmpeg binary into the app's private storage on Android
+    and also produces an 'ffprobe' copy, since yt-dlp's audio postprocessor needs
+    both binaries and Android apps normally ship only a single static executable."""
     if platform != 'android':
         return None
 
@@ -60,20 +65,23 @@ def get_ffmpeg_location():
         return None
 
     internal_dir = app.user_data_dir
-    target_ffmpeg = os.path.join(internal_dir, 'ffmpeg')
     src_ffmpeg = os.path.join(os.path.dirname(__file__), 'ffmpeg.bin')
+    target_ffmpeg = os.path.join(internal_dir, 'ffmpeg')
+    target_ffprobe = os.path.join(internal_dir, 'ffprobe')
 
     if os.path.exists(src_ffmpeg):
-        if not os.path.exists(target_ffmpeg) or os.path.getsize(src_ffmpeg) != os.path.getsize(target_ffmpeg):
-            try:
-                shutil.copy(src_ffmpeg, target_ffmpeg)
-                os.chmod(target_ffmpeg, 0o755)
-            except Exception as e:
-                print(f"Error extracting ffmpeg binary: {e}")
+        for target in (target_ffmpeg, target_ffprobe):
+            if not os.path.exists(target) or os.path.getsize(src_ffmpeg) != os.path.getsize(target):
+                try:
+                    shutil.copy(src_ffmpeg, target)
+                    os.chmod(target, 0o755)
+                except Exception as e:
+                    print(f"Error extracting ffmpeg binary: {e}")
 
-    if os.path.exists(target_ffmpeg):
+    if os.path.exists(target_ffmpeg) and os.path.exists(target_ffprobe):
         return internal_dir
     return None
+
 
 class FluentCard(BoxLayout):
     def __init__(self, bg_color=SECONDARY_COLOR, radius=[dp(14)], **kwargs):
@@ -116,15 +124,25 @@ class RoundedButton(Button):
 
 
 class RoundedTextInput(TextInput):
+    """Text input with a fully custom rounded-rectangle background drawn on the
+    canvas, matching the rest of the app's card styling (instead of the default
+    square Kivy TextInput background)."""
     def __init__(self, **kwargs):
+        # لا نرسم أي خلفية داخل الـ TextInput نفسه، لأن هذا الويدجت يعيد رسم
+        # canvas.before الخاص به تلقائياً عند كل تحديث للنص، وهذا كان يمسح أي
+        # رسم يدوي نضيفه هنا (وهو سبب اختفاء الصندوق والنص المكتوب بالكامل).
+        # الحل: نجعله شفافاً تماماً، ونضعه داخل بطاقة FluentCard منفصلة تتولى
+        # رسم الخلفية الدائرية بدلاً منه (انظر build_ui).
         kwargs['background_normal'] = ''
         kwargs['background_active'] = ''
+        kwargs['background_disabled_normal'] = ''
         super().__init__(**kwargs)
 
-        self.background_color = (0.14, 0.14, 0.18, 1)
+        self.background_color = (0, 0, 0, 0)
         self.foreground_color = (1, 1, 1, 1)
         self.hint_text_color = (0.55, 0.55, 0.6, 1)
         self.cursor_color = (0.95, 0.33, 0.33, 1)
+        self.selection_color = (0.95, 0.33, 0.33, 0.35)
         self.padding = [dp(14), dp(12), dp(14), dp(12)]
 
 
@@ -208,15 +226,9 @@ class DownloadManager:
                 if job in self.jobs:
                     self.jobs.remove(job)
 
-    def start_download(self, job_id):
-        job = self.get_job(job_id)
-        if not job or job.status in ('downloading', 'done'):
-            return False
-
-        job.status = 'downloading'
-        job.progress = 0.0
-        job.is_cancelled = False
-
+    def _get_private_download_dir(self):
+        """كل الملفات تُنزَّل أولاً إلى مجلد خاص بالتطبيق (لا يحتاج أي إذن على أندرويد
+        الحديث)، ثم تُنشر لاحقاً إلى مجلد التنزيلات العام الظاهر لبقية التطبيقات."""
         if platform == 'android':
             try:
                 from jnius import autoclass
@@ -227,7 +239,7 @@ class DownloadManager:
                     download_dir = os.path.join(ext_dir.getAbsolutePath(), "DownKaze")
                 else:
                     download_dir = os.path.join(activity.getFilesDir().getAbsolutePath(), "DownKaze")
-            except:
+            except Exception:
                 download_dir = "."
         else:
             download_dir = os.path.join(os.path.expanduser("~"), "Downloads")
@@ -235,8 +247,20 @@ class DownloadManager:
         if not os.path.exists(download_dir):
             try:
                 os.makedirs(download_dir)
-            except:
+            except Exception:
                 download_dir = "."
+        return download_dir
+
+    def start_download(self, job_id):
+        job = self.get_job(job_id)
+        if not job or job.status in ('downloading', 'done'):
+            return False
+
+        job.status = 'downloading'
+        job.progress = 0.0
+        job.is_cancelled = False
+
+        download_dir = self._get_private_download_dir()
 
         opts = {
             'outtmpl': os.path.join(download_dir, '%(title)s.%(ext)s'),
@@ -258,7 +282,7 @@ class DownloadManager:
                 'preferredquality': '192',
             }]
         else:
-            # الصيغ المعروضة كلها صيغ مدمجة (صوت+صورة) أصلاً، لذلك لا حاجة لأي دمج بعد التحميل
+            # الصيغ المعروضة كلها صيغ مدمجة (صوت+صورة) أصلاً، لا حاجة لأي دمج بعد التحميل
             opts['format'] = job.selected_format_id
 
         def progress_hook(d):
@@ -273,11 +297,20 @@ class DownloadManager:
                 job.eta = d.get('_eta_str', '--:--')
             elif d['status'] == 'finished':
                 job.progress = 100.0
-                job.status = 'done'
                 job.file_path = d.get('filename')
-                job.filename = os.path.basename(job.file_path)
+                job.filename = os.path.basename(job.file_path) if job.file_path else None
+
+        def postprocessor_hook(d):
+            # يلتقط اسم الملف النهائي الصحيح بعد تحويل الصوت إلى mp3
+            if d.get('status') == 'finished':
+                info = d.get('info_dict', {}) or {}
+                final_path = info.get('filepath') or info.get('filename')
+                if final_path:
+                    job.file_path = final_path
+                    job.filename = os.path.basename(final_path)
 
         opts['progress_hooks'] = [progress_hook]
+        opts['postprocessor_hooks'] = [postprocessor_hook]
         job.ydl_opts = opts
 
         t = threading.Thread(target=self._run_ydl, args=(job,))
@@ -289,6 +322,20 @@ class DownloadManager:
         try:
             with yt_dlp.YoutubeDL(job.ydl_opts) as ydl:
                 ydl.download([job.url])
+
+            if job.is_cancelled:
+                return
+
+            if platform == 'android' and job.file_path and os.path.exists(job.file_path):
+                try:
+                    mime = 'audio/mpeg' if job.format_type == 'audio' else 'video/mp4'
+                    self._publish_to_public_downloads_android(job.file_path, job.filename, mime)
+                    job.status = 'done'
+                except Exception as pub_err:
+                    job.status = 'error'
+                    job.error = f"تم التحميل لكن فشل نقله لمجلد التنزيلات العام: {pub_err}"
+            else:
+                job.status = 'done'
         except Exception as e:
             if job.is_cancelled:
                 job.status = 'ready'
@@ -296,6 +343,29 @@ class DownloadManager:
             else:
                 job.status = 'error'
                 job.error = str(e)
+
+    def _publish_to_public_downloads_android(self, temp_path, filename, mime_type):
+        """ينشر الملف من المجلد الخاص بالتطبيق إلى مجلد Downloads العام باستخدام
+        مكتبة androidstorage4kivy، وهي المكتبة الموصى بها رسمياً من فريق Kivy
+        لهذا الغرض بالذات (بدل التعامل اليدوي مع ContentResolver/ContentValues
+        عبر pyjnius، والذي كان يفشل بسبب صعوبة مطابقة أنواع الدوال Java تلقائياً)."""
+        try:
+            from androidstorage4kivy import SharedStorage
+        except ImportError:
+            raise Exception(
+                "مكتبة androidstorage4kivy غير مثبتة. أضف 'androidstorage4kivy' "
+                "إلى requirements في buildozer.spec وأعد بناء الـ APK."
+            )
+
+        shared_storage = SharedStorage()
+        shared_uri = shared_storage.copy_to_shared(temp_path)
+        if not shared_uri:
+            raise Exception("فشل نسخ الملف إلى مجلد Downloads العام")
+
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
 
     def cancel_download(self, job_id):
         job = self.get_job(job_id)
@@ -323,12 +393,16 @@ class MainScreen(Screen):
         )
         root.add_widget(header)
 
+        input_card = FluentCard(
+            bg_color=INPUT_BG, radius=[dp(16)],
+            size_hint_y=None, height=dp(95), padding=dp(2)
+        )
         self.url_input = RoundedTextInput(
             hint_text='Paste video links here... (one per line)',
-            multiline=True, size_hint_y=None, height=dp(95),
-            font_size=sp(14)
+            multiline=True, font_size=sp(14)
         )
-        root.add_widget(self.url_input)
+        input_card.add_widget(self.url_input)
+        root.add_widget(input_card)
 
         selector_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(42), spacing=dp(8))
         self.video_toggle = RoundedButton(
@@ -421,7 +495,6 @@ class MainScreen(Screen):
                 meta = ydl.extract_info(url, download=False)
 
             # الاحتفاظ فقط بالصيغ المدمجة (Progressive) التي تحتوي على صوت وصورة معاً
-            # هذا يلغي الحاجة لأي عملية دمج لاحقة عبر ffmpeg، ويمنع فشل التحميل
             unique_formats = {}
             for f in meta.get('formats', []):
                 h = f.get('height')
@@ -588,7 +661,8 @@ class DownloadsScreen(Screen):
             return
 
         for job in jobs:
-            card = FluentCard(orientation='vertical', size_hint_y=None, height=dp(105), padding=dp(12), spacing=dp(6))
+            card_height = dp(105) if job.status != 'error' else dp(125)
+            card = FluentCard(orientation='vertical', size_hint_y=None, height=card_height, padding=dp(12), spacing=dp(6))
 
             meta_box = BoxLayout(orientation='horizontal')
             meta_box.add_widget(Label(text=job.title[:28] + "...", font_size=sp(13), bold=True, halign='left', size_hint_x=0.7))
@@ -618,6 +692,15 @@ class DownloadsScreen(Screen):
             ctrls.add_widget(remove_btn)
 
             card.add_widget(ctrls)
+
+            if job.status == 'error' and job.error:
+                err_detail = Label(
+                    text=job.error[:90], font_size=sp(10), color=(0.9, 0.55, 0.55, 1),
+                    halign='left', valign='top', size_hint_y=None, height=dp(28)
+                )
+                err_detail.bind(size=err_detail.setter('text_size'))
+                card.add_widget(err_detail)
+
             self.queue_list.add_widget(card)
 
     def go_back(self, instance):
@@ -635,11 +718,18 @@ class DownKazeApp(App):
     def on_start(self):
         if platform == 'android':
             try:
+                from jnius import autoclass
                 from android.permissions import request_permissions, Permission
-                request_permissions([
-                    Permission.WRITE_EXTERNAL_STORAGE,
-                    Permission.READ_EXTERNAL_STORAGE
-                ])
+                BuildVersion = autoclass('android.os.Build$VERSION')
+                sdk_int = BuildVersion.SDK_INT
+                # على أندرويد 10 (API 29) فأعلى، الحفظ يتم عبر MediaStore الذي
+                # لا يحتاج أي إذن تخزين وقت التشغيل، لذلك لا داعي لطلب الإذن هناك
+                # (وهذا سبب عدم ظهور أي نافذة أذونات سابقاً على الأجهزة الحديثة)
+                if sdk_int < 29:
+                    request_permissions([
+                        Permission.WRITE_EXTERNAL_STORAGE,
+                        Permission.READ_EXTERNAL_STORAGE
+                    ])
             except Exception as e:
                 print(f"Permissions request failed: {e}")
 
