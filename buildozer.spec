@@ -8,7 +8,7 @@ source.include_exts = py,png,jpg,kv,atlas,bin
 version = 1.0
 
 # المتطلبات البرمجية الأساسية لعمل التطبيق والتحميل بأمان داخل أندرويد
-requirements = python3,kivy==2.3.0,pyjnius,certifi,yt-dlp
+requirements = python3,kivy==2.3.0,pyjnius,certifi,yt-dlp,androidstorage4kivy
 icon.filename = %(source.dir)s/icon.png
 presplash.filename = %(source.dir)s/presplash.png
 
